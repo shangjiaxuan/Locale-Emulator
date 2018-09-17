@@ -32,62 +32,29 @@ namespace LECommonLibrary
             //    and made sure that the range is correct (all three methods)
             try
             {
-
-                var br = new BinaryReader(new FileStream(path,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite
-                ));
-
-                try
+                using (var br = new BinaryReader(new FileStream(path,
+                                                    FileMode.Open,
+                                                    FileAccess.Read,
+                                                    FileShare.ReadWrite)))
                 {
-                    //fix file handle doesn't close if file is empty
-                    if (br.BaseStream.Length < 0x3c)
-                    {
-                        br.Close();
+                    if (br.BaseStream.Length < 0x3C + 4 || br.ReadUInt16() != 0x5A4D)
                         return PEType.Unknown;
-                    }
-
-                    //see if it is a WIN32 app
-                    if (br.ReadInt16() != 0x4D5A)
-                    {
-                        br.Close();
-                        return PEType.Unknown;
-                    }
 
                     br.BaseStream.Seek(0x3C, SeekOrigin.Begin);
-                    Int32 i = br.ReadInt32();
+                    var pos = br.ReadUInt32() + 4;
 
-                    //make sure that the read range is not outside the stream
-                    //useful if the file starts with 4D5A accidentally
-                    //(e.g. ansi text files starting with "MZ" without BOM heading with ".exe" extension)
-                    if (i + 4 + sizeof(UInt16) >= br.BaseStream.Length || i + 4 < 0)
-                    {
-                        br.Close();
+                    if (pos + 2 > br.BaseStream.Length)
                         return PEType.Unknown;
-                    }
 
-                    br.BaseStream.Seek(i + 4, SeekOrigin.Begin);
+                    br.BaseStream.Seek(pos, SeekOrigin.Begin);
                     var machine = br.ReadUInt16();
-
-                    br.Close();
 
                     if (machine == 0x014C)
                         return PEType.X32;
-
-                    if (machine == 0x8664)
+                    else if (machine == 0x8664)
                         return PEType.X64;
 
                     return PEType.Unknown;
-                }
-                catch
-                {
-                    br.Close();
-                    return PEType.Unknown;
-                }
-                finally
-                {
-                    br.Dispose();
                 }
             }
             catch
